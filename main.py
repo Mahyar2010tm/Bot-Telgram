@@ -4,7 +4,7 @@ from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Dispatcher, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = [8349784604]
+ADMIN_IDS = [8349784604]  # آیدی عددی خودت یا ادمین‌ها
 BOT_USERNAME = "FreecodmCp2025_bot"
 
 bot = Bot(token=BOT_TOKEN)
@@ -45,7 +45,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     back_button = [[InlineKeyboardButton("🔙 برگشت", callback_data="main")]]
 
-    # CP رایگان یا ورود به اکانت
     if data == "cp" or data == "login":
         keyboard = [[InlineKeyboardButton(cp, callback_data=f"cp_{cp}")] for cp in cp_costs.keys()]
         keyboard.append(back_button[0])
@@ -55,18 +54,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cp = data[3:]
         cost = cp_costs[cp]
 
-        # ورود به اکانت
         if user_id in account_info:
             points_needed = cp_points_needed[cp]
-            if users.get(user_id, {"points":0})["points"] >= points_needed:
+            if users.get(user_id, {"points": 0})["points"] >= points_needed:
                 users[user_id]["points"] -= points_needed
                 await query.edit_message_text(f"✅ {cp} انتخاب شد!\n💳 CP در حال واریز است ⏳", reply_markup=InlineKeyboardMarkup(back_button))
                 del account_info[user_id]
             else:
                 await query.edit_message_text(f"❌ برای {cp} نیاز به {points_needed} امتیاز داری.", reply_markup=InlineKeyboardMarkup(back_button))
 
-        # CP رایگان
-        elif users.get(user_id, {"points":0})["points"] >= cost:
+        elif users.get(user_id, {"points": 0})["points"] >= cost:
             users[user_id]["points"] -= cost
             await query.edit_message_text(f"✅ {cp} انتخاب شد!\n💳 CP در حال واریز است ⏳", reply_markup=InlineKeyboardMarkup(back_button))
         else:
@@ -94,14 +91,32 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
-    # ارسال پیام به ادمین‌ها
+
+    # پیام به ادمین
     for admin_id in ADMIN_IDS:
-        await bot.send_message(chat_id=admin_id, text=f"📩 پیام از {user_id} ({update.effective_user.first_name}):\n{text}")
+        await bot.send_message(
+            chat_id=admin_id,
+            text=f"📩 پیام از {user_id} ({update.effective_user.first_name}):\n{text}\n\nبرای پاسخ بنویس:\n/reply {user_id} متن پاسخ"
+        )
+
+# ---------- هندلر پاسخ ادمین ----------
+async def reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    try:
+        args = update.message.text.split(" ", 2)
+        target_id = int(args[1])
+        reply_text = args[2]
+        await bot.send_message(chat_id=target_id, text=f"📬 پیام از پشتیبانی:\n{reply_text}")
+        await update.message.reply_text("✅ پیام برای کاربر ارسال شد.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا در ارسال: {e}")
 
 # ---------- ثبت هندلرها ----------
 dp.add_handler(CommandHandler("start", start))
 dp.add_handler(CallbackQueryHandler(button_handler))
 dp.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), text_handler))
+dp.add_handler(CommandHandler("reply", reply_handler))
 
 # ---------- Webhook ----------
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
